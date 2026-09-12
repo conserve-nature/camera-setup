@@ -1,6 +1,7 @@
 #!/bin/bash
-# Install recurring, unattended host package and major Debian release upgrades.
+# Install operator-triggered host upgrades and an optional, disabled timer.
 set -euo pipefail
+umask 022
 if [[ ${EUID} -ne 0 ]]; then
     echo "Run with sudo: sudo $0" >&2
     exit 1
@@ -54,8 +55,7 @@ journalctl --flush
 cat > /etc/systemd/system/trail-camera-update.service <<'SERVICE'
 [Unit]
 Description=Trail camera unattended package and major OS upgrades
-Wants=network-online.target
-After=network-online.target apt-daily.service apt-daily-upgrade.service
+After=network.target apt-daily.service apt-daily-upgrade.service
 ConditionPathExists=/etc/debian_version
 
 [Service]
@@ -85,11 +85,13 @@ Persistent=true
 [Install]
 WantedBy=timers.target
 TIMER
-# This job owns scheduling. Do not stop an already-running APT service.
-systemctl disable --now apt-daily.timer apt-daily-upgrade.timer
+# Cameras usually operate offline. Reset scheduling to manual on every setup,
+# including migration from earlier versions that enabled this timer by default.
+# Do not stop an already-running package transaction.
+systemctl disable --now trail-camera-update.timer apt-daily.timer apt-daily-upgrade.timer
 systemctl daemon-reload
 exec 9>&-
-systemctl enable --now trail-camera-update.timer
-printf '%s\n' 'Installed. Updates run after boot and daily at 03:00–03:30 device-local time.'
+printf '%s\n' 'Installed. Updates are manual; no update or reboot was started.'
 printf '%s\n' 'Preview: sudo /usr/local/lib/trail-camera/update-os.py --check'
 printf '%s\n' 'Run now: sudo systemctl start --no-block trail-camera-update.service'
+printf '%s\n' 'Optional scheduling: sudo systemctl enable --now trail-camera-update.timer'

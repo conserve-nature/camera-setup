@@ -53,3 +53,30 @@ Automated tests exercise migration parsing, adjacent release checks, source repl
 interrupted dpkg dependency repair, and final-reboot recovery using isolated state
 and mocked package commands. They do not prove future kernel/camera compatibility
 or automatic recovery from an unbootable OS. No destructive power-loss test performed.
+
+## Offline defaults and manual maintenance — 2026-09-13
+
+User clarified that cameras normally operate offline and expressly prohibited
+network disconnection testing on this SSH device. No interfaces were disabled,
+NetworkManager was not reloaded/restarted, and the device was not rebooted.
+
+- Applied revised 01-setup-updates.sh: trail-camera-update.timer, apt-daily.timer,
+  and apt-daily-upgrade.timer are disabled. Update service remained inactive.
+- Applied setup.sh and 02-setup-network.sh: early trail-camera-loopback.service is
+  enabled for next boot but not started; IPv6 lo/default settings and NetworkManager
+  loopback ownership changes are configuration only until the next normal boot.
+- Preserved existing files-first NSS configuration. Updated local hosts mappings,
+  cloud-init policy and Debian hosts template; one-time .trail-camera-network.bak
+  backups retain replaced files.
+- Connected TCP round trips over 127.0.0.1 and ::1 passed before and after setup;
+  localhost and local hostname resolve to loopback. No offline failure was reproduced.
+- systemd-analyze verify passed for the loopback service and updater units.
+  configure-network.py --check reported no remaining changes after application.
+- NetworkManager stayed PID 603, active since 09:25:57 AEST; boot ID remained
+  0d47b26c-5744-4778-99f2-70d0da9ff423. Wi-Fi remained connected with its addresses intact.
+- 78 controlled tests pass, including bootstrap/sudo/clone failures, safe reruns,
+  local hosts/cloud-init transforms, and network configuration idempotency.
+
+The exact published curl bootstrap and its clean-checkout rerun will be verified
+after publication. Boot-time and disconnected behavior are left for the user's
+other device; tests/loopback-smoke.py changes no network configuration.

@@ -20,7 +20,7 @@ A persistent transaction records major upgrade progress and keeps source/config/
 metadata backups. Failed or interrupted upgrades retain the target sources for retry;
 there is no claim of automatic rollback. Concurrent runs use a lock and APT lock waits.
 
-Defaults: run 10 minutes after boot and daily at 03:00 device-local time, each with up to 30 minutes jitter; automatic
+Original defaults (superseded by the offline requirements below): run 10 minutes after boot and daily at 03:00 device-local time, each with up to 30 minutes jitter; automatic
 major upgrades and reboot enabled. Manual check mode previews package changes and source
 migration without installing packages or modifying live APT sources. Installer and updater
 must be rerunnable. Unknown future release-specific migrations cannot be proven today;
@@ -54,3 +54,25 @@ and config.txt was not changed. Do not mark ready until camera functionality ret
 - [x] Commit and push the verified scripts and application record.
 
 Verified implementation published to origin/main as e67ded2.
+
+## Offline operation, manual maintenance, and bootstrap installer
+
+The camera normally runs offline. Keep the update service for explicit operator
+invocation and optional automation; disable boot/daily scheduling on setup, including
+migration of the already-enabled timer on ipaw.local. Setup must finish without an
+OS upgrade or reboot. A curl entrypoint will install Git and prerequisites, clone
+(or safely fast-forward) the official repository, then invoke an explicit setup
+orchestrator. Rerunning local setup should not require Internet access.
+
+Ensure loopback has 127.0.0.1/8 and ::1/128 independently of network-online.target,
+with IPv6 enabled and local hostname/localhost resolution independent of DNS.
+Inspect the actual network manager before choosing configuration. Do not disconnect
+any physical interface, restart NetworkManager, or reboot the SSH device. Offline
+acceptance testing is deferred to the user's separate device.
+
+- [x] Record offline/manual-update and no-disconnection rules in AGENTS.md and lessons.
+- [x] Write a loopback/local resolution regression check before implementing network configuration.
+- [x] Implement manual scheduling defaults and the bootstrap/setup entrypoints.
+- [x] Implement persistent offline loopback configuration without disturbing SSH connectivity.
+- [x] Run controlled tests, apply configuration on ipaw.local, verify connected IPv4/IPv6 loopback and idempotency.
+- [ ] Document the one-command installation and disconnected checks for the user, then commit and push.

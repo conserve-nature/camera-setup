@@ -2,20 +2,40 @@
 
 Host setup for minimal Debian on the 64-bit Raspberry Pi. Run scripts on the host.
 
-## Automated packages and OS upgrades
+## Install everything
 
-Copy this directory to the camera and run:
+Connect the camera to the Internet for installation, then run:
 
 ```sh
-sudo ./01-setup-updates.sh
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/conserve-nature/camera-setup/main/install.sh)"
 ```
 
-This idempotently installs the updater and a systemd timer. By default it runs daily
-at **03:00–03:30 in the device's local timezone**, and **10–40 minutes after boot**,
-including a catch-up run after missed maintenance. Installation enables the timer;
-an overdue boot or daily run can start immediately, but installation does not wait for it.
-APT's two default timers are disabled to give this job ownership of scheduling.
-Existing running APT services are allowed to finish.
+The installer uses sudo when necessary, installs missing prerequisites (including
+Git), clones the official repository into `/opt/trail-camera/camera-setup`, and
+runs `setup.sh`. An existing checkout is updated only by a fast-forward on `main`;
+local changes, a different remote/branch, or divergent history stop installation
+without discarding work. Initial installation requires a Debian-based 64-bit host,
+working Internet access, curl, and root or sudo access.
+
+To reapply the downloaded configuration later, including while offline:
+
+```sh
+sudo /opt/trail-camera/camera-setup/setup.sh
+```
+
+`setup.sh` runs the numbered setup scripts in order. It does not start an OS update,
+reboot, or restart the network manager. Boot-time configuration takes full effect
+on the next operator-initiated reboot. Camera/OS changes can leave a reboot pending;
+choose an appropriate time to reboot locally. Keep the repository files together
+when copying setup to another device.
+
+## Manual packages and OS upgrades
+
+Cameras normally operate offline. Setup installs the update service and an
+**optional disabled timer**. It also disables Debian's `apt-daily.timer` and
+`apt-daily-upgrade.timer`, including an already-enabled trail-camera timer from
+previous versions. Every setup run restores these manual scheduling defaults.
+Existing running package transactions are allowed to finish.
 The installer enables persistent systemd logging capped at 64 MiB / 14 days.
 
 On Raspberry Pi hardware, setup explicitly selects this project's **IMX500 AI
@@ -38,8 +58,8 @@ journalctl -u trail-camera-update.service -n 100 --no-pager
 systemctl list-timers trail-camera-update.timer
 ```
 
-Both package updates and major release upgrades are enabled automatically. The
-updater fully upgrades the current release, preserving local configuration files.
+Once explicitly started, the service handles both package updates and major
+release upgrades without prompts. The updater fully upgrades the current release, preserving local configuration files.
 Package scripts may restart services; `needrestart` only reports stale services to
 avoid restarting the updater from inside its own APT transaction. If packages changed, it reboots;
 this deliberately covers Pi kernel/firmware packages that may not create Debian's
@@ -53,7 +73,7 @@ major release**. It verifies target repository signatures, codename and architec
 simulates dependency resolution, backs up host configuration/package metadata, then
 updates APT suites and performs minimal and full upgrades. If a vendor has not yet
 published matching repositories, the run fails before altering sources and retries
-at the next daily run. Routine current-release updates happen before this check.
+when the operator next starts maintenance (or at the next optional timer run). Routine current-release updates happen before this check.
 The subsequent run confirms the completed major upgrade has been rebooted.
 
 Supported source layouts: conventional `.list` and deb822 `.sources`, pinned to
@@ -77,7 +97,18 @@ Change defaults in `/etc/trail-camera-updates.json` (reinstallation preserves it
 ```
 
 Setting `automatic_reboot` to false requires a manual reboot before a pending major
-transition can proceed. Stop future scheduling with:
+transition can proceed. These settings control an invoked maintenance run; they do
+not schedule one. When an update reboots partway through a major transition, start
+the service again after reconnecting to continue or confirm completion.
+
+For a camera with constant connectivity, opt into scheduling explicitly:
+
+```sh
+sudo systemctl enable --now trail-camera-update.timer
+```
+
+The optional timer runs daily at 03:00–03:30 device-local time and 10–40 minutes
+after boot. Enabling it can immediately run overdue maintenance. Disable it again with:
 
 ```sh
 sudo systemctl disable --now trail-camera-update.timer
@@ -85,6 +116,47 @@ sudo systemctl disable --now trail-camera-update.timer
 
 Stopping the service or shutting down normally waits for the active update to finish.
 A forced power loss can still interrupt dpkg; do not interrupt power deliberately.
+
+## Offline IPv4 and IPv6
+
+`02-setup-network.sh` configures loopback independently of external connectivity.
+The boot service brings `lo` up with `127.0.0.1/8` and `::1/128`, and persistent
+sysctl settings keep IPv6 available on loopback and new interfaces. NetworkManager
+is configured to leave loopback unmanaged on its next normal startup. Physical
+interfaces and their Wi-Fi, DHCP, routing, firewall, and DNS settings are preserved.
+
+Local hosts mappings supply `localhost` and this machine's hostname without an
+external DNS server. Existing unrelated hosts entries are preserved. Cloud-init's
+Debian hosts template is kept consistent too, so regenerating `/etc/hosts` preserves
+loopback mappings. `.local` discovery between devices still requires a functioning
+network; local applications should use `localhost`, `127.0.0.1`, or `::1`.
+
+Setup writes configuration and enables the boot service. It does **not** restart
+NetworkManager, change physical interfaces, apply global sysctl changes live, or
+perform disconnected tests. If the kernel was booted with `ipv6.disable=1`, remove
+that option from the boot command line and reboot at a suitable time before IPv6
+can work; setup reports this prerequisite.
+
+Application caveat: glibc's `AI_ADDRCONFIG` lookup flag ignores loopback when deciding
+whether an address family is configured. A program using that flag can suppress IPv6
+results offline even when `::1` works. Local applications should pass explicit
+`getaddrinfo` hints with flags `0`, or use numeric loopback sockets. See the
+[getaddrinfo manual](https://www.man7.org/linux/man-pages/man3/getaddrinfo.3.html).
+Docker containers have their own network namespaces; this configures the host, not
+container IPv6 networks or access from a container to host services.
+
+On a separate device with local-console access, reboot into this configuration,
+disconnect its external network, then run:
+
+```sh
+python3 /opt/trail-camera/camera-setup/tests/loopback-smoke.py
+systemctl status trail-camera-loopback.service --no-pager
+ip -brief address show lo
+```
+
+The smoke test performs local IPv4/IPv6 TCP round trips and checks local name
+resolution. It does not change network configuration. Disconnected operation has
+not been tested on `ipaw.local`, per the user's instruction.
 
 ## Recovery and records
 
@@ -115,7 +187,9 @@ in advance. Debian documents [sequential upgrades, preparation and recovery](htt
 
 ```sh
 python3 -m unittest discover -s tests -v
-bash -n 01-setup-updates.sh
+bash -n install.sh setup.sh 01-setup-updates.sh 02-setup-network.sh
+# On the host, without changing or disconnecting its network:
+python3 tests/loopback-smoke.py
 # On the camera: check enumeration and capture a still, discarding image data.
 bash tests/camera-smoke.sh
 ```
