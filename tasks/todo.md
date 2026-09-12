@@ -7,7 +7,7 @@
 - [x] Build an idempotent installer and unattended updater with a daily systemd timer.
 - [x] Verify source migration, release guards, recovery, and noninteractive commands with automated tests.
 - [x] Install on ipaw.local, execute a real package update, verify reboot handling and repeat-install behavior.
-- [ ] Record applied changes and verification limits; commit and push the finished repository.
+- [x] Record applied changes and verification limits; commit and push the finished repository.
 
 The device is Debian 13 (trixie), arm64, with Debian and Raspberry Pi APT archives.
 The updater will first fully update the current release, then discover Debian stable from
@@ -51,4 +51,6 @@ and config.txt was not changed. Do not mark ready until camera functionality ret
 - [x] Reboot and pass the same camera capture test on the new kernel.
 - [x] Ensure updater logs survive reboot (the existing journal directory was insufficient).
 - [x] Finish repeat-install and no-change update verification and document results.
-- [ ] Commit and push the verified scripts and application record.
+- [x] Commit and push the verified scripts and application record.
+
+Verified implementation published to origin/main as e67ded2.
