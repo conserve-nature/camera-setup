@@ -77,6 +77,15 @@ NetworkManager was not reloaded/restarted, and the device was not rebooted.
 - 78 controlled tests pass, including bootstrap/sudo/clone failures, safe reruns,
   local hosts/cloud-init transforms, and network configuration idempotency.
 
-The exact published curl bootstrap and its clean-checkout rerun will be verified
-after publication. Boot-time and disconnected behavior are left for the user's
-other device; tests/loopback-smoke.py changes no network configuration.
+The exact published curl bootstrap passed against commit 61baed1. It installed
+Git and its two dependencies (git-man and liberror-perl), with zero existing packages
+upgraded, and cloned the official repository into /opt/trail-camera/camera-setup.
+Both setup steps succeeded. The second invocation fetched the existing clean main
+checkout, skipped package installation, and left configuration hashes unchanged.
+All 78 tests also passed on the Pi, connected socket/name checks passed again, and
+the actual cloud-init template rendered valid IPv4 and IPv6 local mappings. The
+checkout remained clean. NetworkManager PID and boot ID stayed unchanged.
+
+Boot-time and disconnected behavior are left for the user's other device;
+tests/loopback-smoke.py changes no network configuration. The loopback service is
+enabled for next boot, not started during this verification.

@@ -75,4 +75,16 @@ acceptance testing is deferred to the user's separate device.
 - [x] Implement manual scheduling defaults and the bootstrap/setup entrypoints.
 - [x] Implement persistent offline loopback configuration without disturbing SSH connectivity.
 - [x] Run controlled tests, apply configuration on ipaw.local, verify connected IPv4/IPv6 loopback and idempotency.
-- [ ] Document the one-command installation and disconnected checks for the user, then commit and push.
+- [x] Document the one-command installation and disconnected checks for the user, then commit and push.
+
+### Offline setup review
+
+Published implementation: 61baed1. The exact GitHub curl command installed missing
+Git prerequisites, cloned the repository, and ran setup successfully. Repeating it
+preserved configuration hashes and the clean checkout. All 78 tests pass on both
+development host and Pi; connected IPv4/IPv6 TCP, hostname checks, systemd unit
+validation and cloud-init template rendering pass. Update timers are disabled.
+The loopback unit is enabled for next boot but was not started. NetworkManager PID,
+boot ID and Wi-Fi connectivity remained unchanged. No disconnected/namespace tests,
+network reloads, or reboots were performed; offline acceptance is deferred to the
+user's separate device as requested.
